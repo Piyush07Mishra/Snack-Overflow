@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import logo from "../assets/logo.jpeg";
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
@@ -62,6 +63,11 @@ const SignIn = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+        <img
+          src={logo}
+          alt="ReimburX logo"
+          className="w-14 h-14 rounded-md object-cover mx-auto mb-3"
+        />
         <h1 className="text-2xl font-bold text-center mb-1">ReimburX</h1>
         <p className="text-center text-xs text-gray-400 mb-6">
           Sign in to your account

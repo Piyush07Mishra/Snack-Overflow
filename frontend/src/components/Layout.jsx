@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
+import logo from "../assets/logo.jpeg";
 
 const navLinks = {
   admin: [
@@ -48,6 +49,11 @@ const Layout = ({ children }) => {
       {/* Sidebar */}
       <aside className="w-56 bg-white border-r flex flex-col py-6 px-4 gap-2 shrink-0">
         <div className="mb-6">
+          <img
+            src={logo}
+            alt="ReimburX logo"
+            className="w-12 h-12 rounded-md object-cover mb-2"
+          />
           <p className="text-lg font-bold text-gray-900">ReimburX</p>
           <p className="text-xs text-gray-500 truncate mt-0.5">
             {user?.companyName}

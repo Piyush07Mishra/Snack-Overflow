@@ -12,6 +12,15 @@ Production-style reimbursement management platform with multi-tenant isolation, 
 6. Local receipt upload to server storage.
 7. Frontend OCR using Tesseract.js with form autofill (amount, date, description).
 8. Currency conversion to company base currency.
+9. Shared branding with logo displayed across auth and dashboard pages.
+
+## Latest Updates
+
+1. Local receipt upload endpoint added and integrated with Submit Expense.
+2. OCR extraction now auto-fills amount, date, and description.
+3. Draft and submit actions are both available in Submit Expense.
+4. Pending approvals supports inline approve/reject actions.
+5. Global logo branding is applied in sidebar, sign-in, and sign-up pages.
 
 ## Quick Start
 
