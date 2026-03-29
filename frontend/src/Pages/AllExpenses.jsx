@@ -5,6 +5,8 @@ import Layout from "../components/Layout";
 import { toast } from "react-toastify";
 
 const statusColor = {
+  draft: "text-gray-600 bg-gray-100",
+  submitted: "text-indigo-600 bg-indigo-50",
   approved: "text-green-600 bg-green-50",
   rejected: "text-red-600 bg-red-50",
   pending: "text-yellow-600 bg-yellow-50",
@@ -48,7 +50,7 @@ const AllExpenses = () => {
       </h1>
 
       <div className="flex gap-2 mb-4">
-        {["all", "pending", "in_review", "approved", "rejected"].map((s) => (
+        {["all", "draft", "submitted", "pending", "in_review", "approved", "rejected"].map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}

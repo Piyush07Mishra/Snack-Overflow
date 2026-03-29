@@ -9,7 +9,8 @@ const User = {
   findById: async (id) => {
     const r = await pool.query(
       `SELECT u.id, u.full_name, u.email, u.role, u.manager_id, u.is_manager_approver,
-              u.company_id, u.profile_pic, c.base_currency as company_currency, c.name as company_name
+              u.must_change_password, u.company_id, u.profile_pic,
+              c.base_currency as company_currency, c.name as company_name
        FROM users u LEFT JOIN companies c ON u.company_id = c.id WHERE u.id = $1`,
       [id],
     );
@@ -22,11 +23,12 @@ const User = {
     password,
     companyId,
     role = "employee",
+    mustChangePassword = false,
   }) => {
     const r = await pool.query(
-      `INSERT INTO users (full_name, email, password, company_id, role)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [fullName, email, password, companyId, role],
+      `INSERT INTO users (full_name, email, password, company_id, role, must_change_password)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [fullName, email, password, companyId, role, mustChangePassword],
     );
     return r.rows[0];
   },

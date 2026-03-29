@@ -12,10 +12,11 @@ const Expense = {
     expenseDate,
     receiptUrl,
     ocrData,
+    status,
   }) => {
     const r = await pool.query(
-      `INSERT INTO expenses (company_id, submitted_by, amount, currency, amount_in_base, category, description, expense_date, receipt_url, ocr_data)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      `INSERT INTO expenses (company_id, submitted_by, amount, currency, amount_in_base, category, description, expense_date, receipt_url, ocr_data, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [
         companyId,
         submittedBy,
@@ -27,17 +28,18 @@ const Expense = {
         expenseDate,
         receiptUrl,
         ocrData ? JSON.stringify(ocrData) : null,
+        status || "submitted",
       ],
     );
     return r.rows[0];
   },
 
-  findByUser: async (userId) => {
+  findByUser: async (userId, companyId) => {
     const r = await pool.query(
       `SELECT e.*, u.full_name as submitter_name
        FROM expenses e JOIN users u ON e.submitted_by = u.id
-       WHERE e.submitted_by = $1 ORDER BY e.created_at DESC`,
-      [userId],
+       WHERE e.submitted_by = $1 AND e.company_id = $2 ORDER BY e.created_at DESC`,
+      [userId, companyId],
     );
     return r.rows;
   },
@@ -87,15 +89,16 @@ const Expense = {
   },
 
   // Expenses pending approval for a specific approver
-  findPendingForApprover: async (approverId) => {
+  findPendingForApprover: async (approverId, companyId) => {
     const r = await pool.query(
       `SELECT e.*, u.full_name as submitter_name, ea.id as approval_id, ea.step_order
        FROM expense_approvals ea
        JOIN expenses e ON ea.expense_id = e.id
        JOIN users u ON e.submitted_by = u.id
-       WHERE ea.approver_id = $1 AND ea.status = 'pending' AND e.status IN ('pending','in_review')
+       WHERE ea.approver_id = $1 AND ea.status = 'pending' AND e.status IN ('pending','in_review','submitted')
+         AND e.company_id = $2
        ORDER BY e.created_at DESC`,
-      [approverId],
+      [approverId, companyId],
     );
     return r.rows;
   },

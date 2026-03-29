@@ -3,6 +3,8 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import dotenv from "dotenv";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import { pool, initDB } from "./src/lib/db.js";
 import authRouter from "./src/routes/auth.route.js";
 import userRouter from "./src/routes/user.route.js";
@@ -15,10 +17,13 @@ initDB();
 
 const app = express();
 const PgSession = connectPgSimple(session);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use(
   session({

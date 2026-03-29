@@ -93,11 +93,40 @@ export const initDB = async () => {
         company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         rule_type VARCHAR(20) NOT NULL CHECK (rule_type IN ('sequential','percentage','specific_approver','hybrid')),
+        manager_approval_required BOOLEAN DEFAULT true,
+        sequential_approval BOOLEAN DEFAULT true,
         percentage_threshold NUMERIC(5,2),
+        min_approvals_percentage NUMERIC(5,2),
+        auto_approve_role VARCHAR(20),
         specific_approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    // Keep expenses status extensible for draft/submitted lifecycle
+    try {
+      await pool.query(`ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_status_check`);
+      await pool.query(`
+        ALTER TABLE expenses ADD CONSTRAINT expenses_status_check
+        CHECK (status IN ('draft','submitted','pending','approved','rejected','in_review'))
+      `);
+    } catch (_) {}
+
+    // Approval rule migrations for the new field-driven model
+    const ruleMigrations = [
+      `ALTER TABLE approval_rules ADD COLUMN IF NOT EXISTS manager_approval_required BOOLEAN DEFAULT true`,
+      `ALTER TABLE approval_rules ADD COLUMN IF NOT EXISTS sequential_approval BOOLEAN DEFAULT true`,
+      `ALTER TABLE approval_rules ADD COLUMN IF NOT EXISTS min_approvals_percentage NUMERIC(5,2)`,
+      `ALTER TABLE approval_rules ADD COLUMN IF NOT EXISTS auto_approve_role VARCHAR(20)`,
+      `UPDATE approval_rules SET min_approvals_percentage = percentage_threshold WHERE min_approvals_percentage IS NULL AND percentage_threshold IS NOT NULL`,
+      `UPDATE approval_rules SET sequential_approval = CASE WHEN rule_type = 'sequential' THEN true ELSE sequential_approval END`,
+      `UPDATE approval_rules SET manager_approval_required = COALESCE(manager_approval_required, true)`,
+    ];
+    for (const sql of ruleMigrations) {
+      try {
+        await pool.query(sql);
+      } catch (_) {}
+    }
 
     // Approval steps
     await pool.query(`

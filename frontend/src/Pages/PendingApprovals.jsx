@@ -1,21 +1,49 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import api from "../api/axios";
 import Layout from "../components/Layout";
-import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
+
+const statusColor = {
+  submitted: "text-indigo-600 bg-indigo-50",
+  pending: "text-yellow-600 bg-yellow-50",
+  in_review: "text-blue-600 bg-blue-50",
+};
 
 const PendingApprovals = () => {
-  const { user } = useAuth();
   const [expenses, setExpenses] = useState([]);
+  const [comments, setComments] = useState({});
+  const [actingId, setActingId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchPending = () => {
+    setLoading(true);
     api
       .get("/expenses/pending")
       .then((r) => setExpenses(r.data.expenses))
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchPending();
   }, []);
+
+  const handleAction = async (expenseId, action) => {
+    setActingId(expenseId);
+    try {
+      await api.post(`/expenses/${expenseId}/action`, {
+        action,
+        comment: comments[expenseId] || "",
+      });
+      toast.success(`Expense ${action}`);
+      setComments((prev) => ({ ...prev, [expenseId]: "" }));
+      fetchPending();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Action failed");
+    } finally {
+      setActingId(null);
+    }
+  };
 
   return (
     <Layout>
@@ -37,6 +65,8 @@ const PendingApprovals = () => {
                 <th className="px-4 py-3">Base Amount</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Step</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Comment</th>
                 <th className="px-4 py-3">Action</th>
               </tr>
             </thead>
@@ -61,12 +91,40 @@ const PendingApprovals = () => {
                     Step {e.step_order}
                   </td>
                   <td className="px-4 py-3">
-                    <Link
-                      to={`/expenses/${e.id}`}
-                      className="text-blue-600 hover:underline text-xs"
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[e.status] || "text-gray-600 bg-gray-100"}`}
                     >
-                      Review
-                    </Link>
+                      {e.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="text"
+                      value={comments[e.id] || ""}
+                      onChange={(ev) =>
+                        setComments((prev) => ({ ...prev, [e.id]: ev.target.value }))
+                      }
+                      placeholder="Optional comment"
+                      className="w-40 border border-gray-300 rounded-sm px-2 py-1 text-xs outline-none focus:border-gray-500"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAction(e.id, "approved")}
+                        disabled={actingId === e.id}
+                        className="text-green-600 hover:underline text-xs disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleAction(e.id, "rejected")}
+                        disabled={actingId === e.id}
+                        className="text-red-500 hover:underline text-xs disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

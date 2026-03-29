@@ -1,21 +1,58 @@
 import { pool } from "../lib/db.js";
 
+const deriveRuleType = ({
+  sequentialApproval,
+  minApprovalsPercentage,
+  specificApproverId,
+  ruleType,
+}) => {
+  if (ruleType) return ruleType;
+  const hasPct = minApprovalsPercentage !== null && minApprovalsPercentage !== undefined && minApprovalsPercentage !== "";
+  const hasSpecific = !!specificApproverId;
+  if (hasPct && hasSpecific) return "hybrid";
+  if (hasPct) return "percentage";
+  if (hasSpecific) return "specific_approver";
+  return sequentialApproval === false ? "hybrid" : "sequential";
+};
+
 const ApprovalRule = {
   create: async ({
     companyId,
     name,
     ruleType,
+    managerApprovalRequired,
+    sequentialApproval,
+    minApprovalsPercentage,
+    autoApproveRole,
     percentageThreshold,
     specificApproverId,
   }) => {
+    const effectivePercentage =
+      minApprovalsPercentage !== undefined && minApprovalsPercentage !== null && minApprovalsPercentage !== ""
+        ? minApprovalsPercentage
+        : percentageThreshold;
+    const effectiveRuleType = deriveRuleType({
+      sequentialApproval,
+      minApprovalsPercentage: effectivePercentage,
+      specificApproverId,
+      ruleType,
+    });
+
     const r = await pool.query(
-      `INSERT INTO approval_rules (company_id, name, rule_type, percentage_threshold, specific_approver_id)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      `INSERT INTO approval_rules (
+         company_id, name, rule_type, manager_approval_required, sequential_approval,
+         percentage_threshold, min_approvals_percentage, auto_approve_role, specific_approver_id
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [
         companyId,
         name,
-        ruleType,
-        percentageThreshold || null,
+        effectiveRuleType,
+        managerApprovalRequired ?? true,
+        sequentialApproval ?? true,
+        effectivePercentage || null,
+        effectivePercentage || null,
+        autoApproveRole || null,
         specificApproverId || null,
       ],
     );

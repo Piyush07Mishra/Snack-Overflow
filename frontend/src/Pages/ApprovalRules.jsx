@@ -3,7 +3,7 @@ import api from "../api/axios";
 import Layout from "../components/Layout";
 import { toast } from "react-toastify";
 
-const RULE_TYPES = ["sequential", "percentage", "specific_approver", "hybrid"];
+const AUTO_APPROVE_ROLES = ["", "manager", "director", "admin", "employee"];
 
 const ApprovalRules = () => {
   const [rules, setRules] = useState([]);
@@ -11,8 +11,10 @@ const ApprovalRules = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    ruleType: "sequential",
-    percentageThreshold: "",
+    managerApprovalRequired: true,
+    sequentialApproval: true,
+    minApprovalsPercentage: "",
+    autoApproveRole: "",
     specificApproverId: "",
     steps: [],
   });
@@ -56,8 +58,10 @@ const ApprovalRules = () => {
       setShowForm(false);
       setForm({
         name: "",
-        ruleType: "sequential",
-        percentageThreshold: "",
+        managerApprovalRequired: true,
+        sequentialApproval: true,
+        minApprovalsPercentage: "",
+        autoApproveRole: "",
         specificApproverId: "",
         steps: [],
       });
@@ -108,63 +112,81 @@ const ApprovalRules = () => {
                 className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500"
               />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={form.managerApprovalRequired}
+                  onChange={(e) =>
+                    setForm({ ...form, managerApprovalRequired: e.target.checked })
+                  }
+                />
+                Require manager approval first
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={form.sequentialApproval}
+                  onChange={(e) =>
+                    setForm({ ...form, sequentialApproval: e.target.checked })
+                  }
+                />
+                Enforce sequential steps
+              </label>
+            </div>
+
             <div>
               <label className="text-sm text-gray-600 mb-1 block">
-                Rule Type
+                Minimum Approval Threshold (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={form.minApprovalsPercentage}
+                onChange={(e) =>
+                  setForm({ ...form, minApprovalsPercentage: e.target.value })
+                }
+                className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">
+                Auto-Approve Role (optional)
               </label>
               <select
-                value={form.ruleType}
-                onChange={(e) => setForm({ ...form, ruleType: e.target.value })}
+                value={form.autoApproveRole}
+                onChange={(e) => setForm({ ...form, autoApproveRole: e.target.value })}
                 className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500 bg-white"
               >
-                {RULE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {AUTO_APPROVE_ROLES.map((r) => (
+                  <option key={r || "none"} value={r}>
+                    {r || "-- None --"}
                   </option>
                 ))}
               </select>
             </div>
 
-            {(form.ruleType === "percentage" || form.ruleType === "hybrid") && (
-              <div>
-                <label className="text-sm text-gray-600 mb-1 block">
-                  Approval Threshold (%)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={form.percentageThreshold}
-                  onChange={(e) =>
-                    setForm({ ...form, percentageThreshold: e.target.value })
-                  }
-                  className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500"
-                />
-              </div>
-            )}
-
-            {(form.ruleType === "specific_approver" ||
-              form.ruleType === "hybrid") && (
-              <div>
-                <label className="text-sm text-gray-600 mb-1 block">
-                  Specific Approver (auto-approves)
-                </label>
-                <select
-                  value={form.specificApproverId}
-                  onChange={(e) =>
-                    setForm({ ...form, specificApproverId: e.target.value })
-                  }
-                  className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500 bg-white"
-                >
-                  <option value="">-- Select --</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.full_name} ({m.role})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="text-sm text-gray-600 mb-1 block">
+                Specific Approver (optional, auto-approves)
+              </label>
+              <select
+                value={form.specificApproverId}
+                onChange={(e) =>
+                  setForm({ ...form, specificApproverId: e.target.value })
+                }
+                className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500 bg-white"
+              >
+                <option value="">-- Select --</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name} ({m.role})
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Steps */}
             <div>
@@ -241,9 +263,13 @@ const ApprovalRules = () => {
                 <div>
                   <p className="font-semibold text-gray-800">{rule.name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {rule.rule_type}
-                    {rule.percentage_threshold
-                      ? ` — ${rule.percentage_threshold}% threshold`
+                    {rule.sequential_approval ? "Sequential" : "Parallel"}
+                    {(rule.min_approvals_percentage || rule.percentage_threshold)
+                      ? ` — ${rule.min_approvals_percentage || rule.percentage_threshold}% threshold`
+                      : ""}
+                    {rule.manager_approval_required ? " — Manager required" : ""}
+                    {rule.auto_approve_role
+                      ? ` — Auto role: ${rule.auto_approve_role}`
                       : ""}
                   </p>
                 </div>

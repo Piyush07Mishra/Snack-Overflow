@@ -1,6 +1,7 @@
 import express from "express";
 import {
   submitExpense,
+  uploadReceipt,
   getMyExpenses,
   getAllExpenses,
   getPendingApprovals,
@@ -10,6 +11,7 @@ import {
 } from "../controllers/expense.controller.js";
 import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validation.middleware.js";
+import { receiptUpload } from "../middlewares/upload.middleware.js";
 import {
   submitExpenseValidator,
   expenseActionValidator,
@@ -19,6 +21,7 @@ const router = express.Router();
 
 router.use(requireAuth);
 router.post("/", submitExpenseValidator, validate, submitExpense); // employee
+router.post("/upload-receipt", receiptUpload.single("receipt"), uploadReceipt);
 router.get("/my", getMyExpenses); // employee
 router.get("/all", requireRole("admin"), getAllExpenses); // admin
 router.get("/pending", requireRole("admin", "manager"), getPendingApprovals); // manager/admin

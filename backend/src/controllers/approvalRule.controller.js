@@ -11,16 +11,29 @@ export const getRules = async (req, res) => {
 };
 
 export const createRule = async (req, res) => {
-  const { name, ruleType, percentageThreshold, specificApproverId, steps } =
-    req.body;
-  if (!name || !ruleType) {
-    return res.status(400).json({ message: "name and ruleType are required" });
+  const {
+    name,
+    ruleType,
+    managerApprovalRequired,
+    sequentialApproval,
+    minApprovalsPercentage,
+    autoApproveRole,
+    percentageThreshold,
+    specificApproverId,
+    steps,
+  } = req.body;
+  if (!name) {
+    return res.status(400).json({ message: "name is required" });
   }
   try {
     const rule = await ApprovalRule.create({
       companyId: req.user.company_id,
       name,
       ruleType,
+      managerApprovalRequired,
+      sequentialApproval,
+      minApprovalsPercentage,
+      autoApproveRole,
       percentageThreshold,
       specificApproverId,
     });
@@ -29,9 +42,9 @@ export const createRule = async (req, res) => {
       for (const step of steps) {
         await ApprovalRule.addStep({
           ruleId: rule.id,
-          stepOrder: step.stepOrder,
-          approverId: step.approverId,
-          approverRole: step.approverRole,
+          stepOrder: step.stepOrder || step.step_order,
+          approverId: step.approverId || step.approver_id,
+          approverRole: step.approverRole || step.approver_role,
         });
       }
     }

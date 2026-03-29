@@ -17,6 +17,7 @@ const Users = () => {
   });
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [autoGeneratePassword, setAutoGeneratePassword] = useState(true);
 
   const fetchUsers = () => {
     api
@@ -37,8 +38,17 @@ const Users = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/users", form);
-      toast.success("User created");
+      const payload = {
+        ...form,
+        password: autoGeneratePassword ? "" : form.password,
+      };
+      const res = await api.post("/users", payload);
+      const tempPassword = res.data?.user?.temporaryPassword;
+      if (tempPassword) {
+        toast.success(`User created. Temporary password: ${tempPassword}`);
+      } else {
+        toast.success("User created");
+      }
       setShowForm(false);
       setForm({
         fullName: "",
@@ -48,6 +58,7 @@ const Users = () => {
         managerId: "",
         isManagerApprover: false,
       });
+      setAutoGeneratePassword(true);
       fetchUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || "Error creating user");
@@ -105,7 +116,6 @@ const Users = () => {
             {[
               { label: "Full Name", name: "fullName", type: "text" },
               { label: "Email", name: "email", type: "email" },
-              { label: "Password", name: "password", type: "password" },
             ].map(({ label, name, type }) => (
               <div key={name}>
                 <label className="text-sm text-gray-600 mb-1 block">
@@ -120,11 +130,41 @@ const Users = () => {
                 />
               </div>
             ))}
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoGeneratePassword}
+                onChange={(e) => setAutoGeneratePassword(e.target.checked)}
+              />
+              Auto-generate temporary password
+            </label>
+            {!autoGeneratePassword && (
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required={!autoGeneratePassword}
+                  minLength={6}
+                  className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500"
+                />
+              </div>
+            )}
             <div>
               <label className="text-sm text-gray-600 mb-1 block">Role</label>
               <select
                 value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    role: e.target.value,
+                    managerId:
+                      e.target.value === "employee" ? form.managerId : "",
+                  })
+                }
                 className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500 bg-white"
               >
                 <option value="employee">Employee</option>
@@ -132,25 +172,27 @@ const Users = () => {
                 <option value="director">Director</option>
               </select>
             </div>
-            <div>
-              <label className="text-sm text-gray-600 mb-1 block">
-                Assign Manager
-              </label>
-              <select
-                value={form.managerId}
-                onChange={(e) =>
-                  setForm({ ...form, managerId: e.target.value })
-                }
-                className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500 bg-white"
-              >
-                <option value="">-- None --</option>
-                {managers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.full_name} ({m.role})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {form.role === "employee" && (
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">
+                  Assign Manager
+                </label>
+                <select
+                  value={form.managerId}
+                  onChange={(e) =>
+                    setForm({ ...form, managerId: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500 bg-white"
+                >
+                  <option value="">-- None --</option>
+                  {managers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.full_name} ({m.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
               <input
                 type="checkbox"
@@ -225,25 +267,29 @@ const Users = () => {
                   </td>
                   <td className="px-4 py-3 text-gray-400">
                     {editId === u.id ? (
-                      <select
-                        value={editForm.managerId ?? u.manager_id ?? ""}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            managerId: e.target.value || null,
-                          })
-                        }
-                        className="border rounded px-2 py-1 text-xs bg-white"
-                      >
-                        <option value="">None</option>
-                        {managers
-                          .filter((m) => m.id !== u.id)
-                          .map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.full_name}
-                            </option>
-                          ))}
-                      </select>
+                      (editForm.role || u.role) === "employee" ? (
+                        <select
+                          value={editForm.managerId ?? u.manager_id ?? ""}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              managerId: e.target.value || null,
+                            })
+                          }
+                          className="border rounded px-2 py-1 text-xs bg-white"
+                        >
+                          <option value="">None</option>
+                          {managers
+                            .filter((m) => m.id !== u.id)
+                            .map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.full_name}
+                              </option>
+                            ))}
+                        </select>
+                      ) : (
+                        "-"
+                      )
                     ) : (
                       u.manager_name || "-"
                     )}

@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
+import ReceiptUpload from "../components/ReceiptUpload";
 
 const CATEGORIES = [
   "Travel",
@@ -31,6 +32,7 @@ const SubmitExpense = () => {
     ruleId: "",
   });
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState("submitted");
 
   useEffect(() => {
     api
@@ -52,12 +54,27 @@ const SubmitExpense = () => {
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
+  const handleOCRData = (data) => {
+    setForm((prev) => ({
+      ...prev,
+      amount: data.amount || prev.amount,
+      expenseDate: data.expenseDate || prev.expenseDate,
+      description: data.description || prev.description,
+    }));
+    toast.success("Receipt data extracted. Please review and edit if needed.");
+  };
+
+  const handleReceiptUploaded = (receiptUrl) => {
+    if (!receiptUrl) return;
+    setForm((prev) => ({ ...prev, receiptUrl }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post("/expenses", form);
-      toast.success("Expense submitted!");
+      await api.post("/expenses", { ...form, status: mode });
+      toast.success(mode === "draft" ? "Draft saved!" : "Expense submitted!");
       navigate("/expenses/my");
     } catch (err) {
       toast.error(err.response?.data?.message || "Submission failed");
@@ -165,6 +182,8 @@ const SubmitExpense = () => {
             />
           </div>
 
+          <ReceiptUpload onExtract={handleOCRData} onUploaded={handleReceiptUploaded} />
+
           {rules.length > 0 && (
             <div>
               <label className="text-sm text-gray-600 mb-1 block">
@@ -179,7 +198,7 @@ const SubmitExpense = () => {
                 <option value="">-- Default / Manager only --</option>
                 {rules.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.name} ({r.rule_type})
+                    {r.name} ({r.sequential_approval ? "sequential" : "parallel"})
                   </option>
                 ))}
               </select>
@@ -189,9 +208,18 @@ const SubmitExpense = () => {
           <button
             type="submit"
             disabled={loading}
+            onClick={() => setMode("submitted")}
             className="mt-2 w-full bg-gray-900 text-white rounded-sm py-2 text-sm hover:bg-gray-700 transition disabled:opacity-50"
           >
             {loading ? "Submitting..." : "Submit Expense"}
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            onClick={() => setMode("draft")}
+            className="w-full border border-gray-300 text-gray-700 rounded-sm py-2 text-sm hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            {loading ? "Saving..." : "Save as Draft"}
           </button>
         </form>
       </div>

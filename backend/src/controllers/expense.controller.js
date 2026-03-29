@@ -4,6 +4,22 @@ import { pool } from "../lib/db.js";
 import axios from "axios";
 import approvalEngine from "../services/approvalEngine.service.js";
 
+export const uploadReceipt = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Receipt file is required" });
+    }
+
+    const receiptUrl = `${req.protocol}://${req.get("host")}/uploads/receipts/${req.file.filename}`;
+    res.status(201).json({
+      message: "Receipt uploaded successfully",
+      receiptUrl,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error uploading receipt" });
+  }
+};
+
 const convertCurrency = async (amount, fromCurrency, toCurrency) => {
   if (fromCurrency === toCurrency) return amount;
   try {
@@ -26,6 +42,7 @@ export const submitExpense = async (req, res) => {
     expenseDate,
     receiptUrl,
     ruleId,
+    status,
   } = req.body;
   if (!amount || !currency || !category || !expenseDate) {
     return res
@@ -53,7 +70,12 @@ export const submitExpense = async (req, res) => {
       description,
       expenseDate,
       receiptUrl: receiptUrl || null,
+      status: status === "draft" ? "draft" : "submitted",
     });
+
+    if (status === "draft") {
+      return res.status(201).json({ message: "Expense saved as draft", expense });
+    }
 
     // Build approval queue
     const rule = ruleId
@@ -92,7 +114,7 @@ export const submitExpense = async (req, res) => {
 
 export const getMyExpenses = async (req, res) => {
   try {
-    const expenses = await Expense.findByUser(req.user.id);
+    const expenses = await Expense.findByUser(req.user.id, req.user.company_id);
     res.json({ expenses });
   } catch (err) {
     res.status(500).json({ message: "Error fetching expenses" });
@@ -110,7 +132,7 @@ export const getAllExpenses = async (req, res) => {
 
 export const getPendingApprovals = async (req, res) => {
   try {
-    const expenses = await Expense.findPendingForApprover(req.user.id);
+    const expenses = await Expense.findPendingForApprover(req.user.id, req.user.company_id);
     res.json({ expenses });
   } catch (err) {
     res.status(500).json({ message: "Error fetching pending approvals" });

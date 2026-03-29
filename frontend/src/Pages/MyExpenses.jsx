@@ -4,6 +4,8 @@ import api from "../api/axios";
 import Layout from "../components/Layout";
 
 const statusColor = {
+  draft: "text-gray-600 bg-gray-100",
+  submitted: "text-indigo-600 bg-indigo-50",
   approved: "text-green-600 bg-green-50",
   rejected: "text-red-600 bg-red-50",
   pending: "text-yellow-600 bg-yellow-50",
