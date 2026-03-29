@@ -1,313 +1,318 @@
-# Reimbursement System E2E Test Flow
+# Reimbursement System Final E2E Test Plan
 
-This document is for manual end-to-end testing of what is currently implemented.
+This checklist is aligned to the current codebase and should be used as the final manual QA pass.
 
-## 1. Pre-check
+## 1. Environment Setup
 
-1. Make sure PostgreSQL is running.
-2. Backend env should be set in backend/.env:
+1. Ensure PostgreSQL is running.
+2. Configure backend env in backend/.env with at least:
 - DATABASE_URL
-- SESSION_SECRET (also used as JWT secret fallback)
+- SESSION_SECRET
+- JWT_SECRET (recommended)
 - PORT=5001
 3. Install dependencies:
 - npm --prefix backend install
 - npm --prefix frontend install
-4. Run apps:
+4. Start services:
 - npm --prefix backend start
 - npm --prefix frontend run dev
-5. Open app:
+5. Open application:
 - http://localhost:5173
 
-## 2. Dummy Users and Companies
+Expected:
 
-Use these test identities.
+1. Backend starts without schema errors.
+2. Frontend loads sign in page.
 
-Company A:
-- Admin: admin.alpha@mail.com / Admin@123
-- Director: dia.alpha@mail.com / Dir@12345
-- Manager: man.alpha@mail.com / Man@12345
-- Employee 1: emp1.alpha@mail.com / Emp@12345
-- Employee 2: emp2.alpha@mail.com / Emp@12345
+## 2. Authentication and Validation
 
-Company B (tenant isolation test):
-- Admin: admin.beta@mail.com / Admin@123
-- Employee: emp.beta@mail.com / Emp@12345
+### 2.1 Signup (first admin + company creation)
 
-## 3. Auth and Company Creation
-
-### 3.1 Admin signup (Company A)
-
-UI path:
-1. Go to signup page.
-2. Fill:
+1. Go to signup.
+2. Create Company A admin:
 - Name: Alpha Admin
-- Company Name: Alpha Corp
+- Company: Alpha Corp
 - Country: India
 - Email: admin.alpha@mail.com
 - Password: Admin@123
 - Confirm Password: Admin@123
-3. Submit.
 
 Expected:
-1. Account created.
+
+1. Signup success.
 2. Redirect to dashboard.
-3. JWT token stored in browser localStorage key auth_token.
-4. Company auto-created.
-5. Base currency should be INR for India.
+3. Company is created.
+4. JWT token is saved in localStorage auth_token.
+5. Base currency is set from country.
 
-### 3.2 Invalid form checks
+### 2.2 Signup invalid data checks
 
-Try and confirm validation errors:
-1. Name with number (Alpha1) should fail.
-2. Invalid email (alpha@mail123) should fail.
-3. Password shorter than 6 should fail.
-4. Password mismatch should fail.
+Attempt and verify failure messages:
 
-### 3.3 Login and me endpoint
+1. Name containing digits.
+2. Invalid email format.
+3. Password shorter than 6.
+4. Password mismatch.
+
+### 2.3 Login and session checks
 
 1. Logout.
-2. Login using admin.alpha@mail.com / Admin@123.
-3. Verify dashboard loads.
-
-Optional API check:
-1. POST /api/auth/login should return token.
-2. GET /api/auth/me with Authorization Bearer token should return 200.
-3. GET /api/auth/me without token should return 401.
-
-## 4. Admin User Management
-
-Login as Company A admin.
-
-### 4.1 Create users
-
-Go to Users page and create:
-1. Director:
-- fullName: Dia Director
-- email: dia.alpha@mail.com
-- role: director
-- password: Dir@12345
-
-2. Manager:
-- fullName: Mark Manager
-- email: man.alpha@mail.com
-- role: manager
-- password: Man@12345
-
-3. Employee 1:
-- fullName: Sarah Employee
-- email: emp1.alpha@mail.com
-- role: employee
-- password: Emp@12345
-- assign manager: Mark Manager
-- is manager approver: true
-
-4. Employee 2:
-- fullName: Evan Employee
-- email: emp2.alpha@mail.com
-- role: employee
-- password: Emp@12345
-- assign manager: Mark Manager
+2. Login with valid admin credentials.
+3. Open protected page directly via URL.
 
 Expected:
-1. Users list shows all users in same company.
-2. Roles are visible and editable.
-3. Manager mapping saved.
 
-### 4.2 Role update and delete
+1. Login succeeds with token.
+2. Protected pages remain accessible while token exists.
+3. After manual token removal, protected pages redirect/deny.
 
-1. Edit Employee 2 role to manager then back to employee.
-2. Delete Employee 2.
+## 3. Admin User Management
 
-Expected:
-1. Updates persist.
-2. Delete removes user.
-3. Admin user cannot be accidentally removed from UI action flow.
+Login as Company A admin and open Users page.
 
-## 5. Approval Rules
+### 3.1 Create users with optional password generation
 
-As Company A admin, go to Approval Rules.
+Create users:
 
-Create rules:
-1. Sequential Rule:
-- name: Seq Approval
-- ruleType: sequential
-- steps: manager then director
-
-2. Percentage Rule:
-- name: Pct 60
-- ruleType: percentage
-- threshold: 60
-- add at least two approver steps
-
-3. Specific Approver Rule:
-- name: Director Override
-- ruleType: specific_approver
-- specificApproverId: Dia Director
-
-4. Hybrid Rule:
-- name: Hybrid 60 or Director
-- ruleType: hybrid
-- threshold: 60
-- specificApproverId: Dia Director
-- add steps
+1. Director with manual password.
+2. Manager with manual password.
+3. Employee with manager assignment and Is Manager Approver checked.
+4. Employee with auto-generated password enabled.
 
 Expected:
-1. Rule list shows each rule with its steps.
-2. Delete rule works.
 
-## 6. Employee Expense Submission
+1. Users are created within Company A only.
+2. Auto-generated password flow shows success and sends usable credentials.
+3. Employee manager assignment persists.
+4. Invalid manager assignment is rejected.
 
-Login as Employee 1 (emp1.alpha@mail.com / Emp@12345).
+### 3.2 Edit users
 
-1. Go to Submit Expense.
-2. Submit expense:
-- amount: 100
-- currency: USD
-- category: Travel
-- description: Taxi and meals
-- expenseDate: today
-- select rule: Seq Approval
+1. Change employee role to manager, then back to employee.
+2. Assign and unassign manager.
+3. Toggle Is Manager Approver.
 
 Expected:
-1. Expense created.
-2. In My Expenses, record appears.
-3. amount_in_base should be populated (converted value in company currency).
-4. Status should be in_review or pending depending on queue.
 
-## 7. Approval Flow (Sequential)
+1. Role updates persist.
+2. Manager field is enforced only where valid.
+3. Manager self-assignment is rejected.
 
-### 7.1 Manager action
+### 3.3 Send password and delete
 
-Login as manager (man.alpha@mail.com / Man@12345).
-
-1. Open Pending Approvals.
-2. Open submitted expense.
-3. Add comment and approve.
+1. Use Send Password on a non-admin user.
+2. Delete a test employee.
 
 Expected:
-1. Step updates to approved for manager.
-2. Expense moves to next step (director) and remains in_review.
 
-### 7.2 Director action
+1. Password send endpoint succeeds for same-company users.
+2. Deletion removes user from list.
 
-Login as director (dia.alpha@mail.com / Dir@12345).
+## 4. Approval Rules
 
-1. Open Pending Approvals.
-2. Approve same expense.
+As Company A admin, open Approval Rules.
+
+Create at least two rules:
+
+1. Rule A:
+- managerApprovalRequired true
+- sequentialApproval true
+- explicit step chain manager -> director
+
+2. Rule B:
+- managerApprovalRequired true
+- minApprovalsPercentage 60
+- autoApproveRole director (or specificApproverId)
 
 Expected:
-1. Final expense status becomes approved.
-2. Timeline shows both actions with timestamps and comments.
 
-## 8. Reject and Override Flow
+1. Rules save and appear in list.
+2. Steps render correctly.
+3. Rule delete works.
 
-### 8.1 Reject
+## 5. Expense Submission Lifecycle
 
-1. Submit one more expense as Employee 1.
-2. Manager rejects with comment.
+Login as employee.
+
+### 5.1 Save draft
+
+1. Open Submit Expense.
+2. Fill required fields.
+3. Click Save as Draft.
 
 Expected:
-1. Expense status becomes rejected.
-2. Remaining pending approvals are closed as rejected.
 
-### 8.2 Admin override
+1. Expense appears in My Expenses with draft status.
+2. Draft is visible in admin All Expenses filters.
 
-Login as admin.
+### 5.2 Submit expense
+
+1. Create another expense and click Submit Expense.
+2. Select an approval rule.
+
+Expected:
+
+1. Expense is created with submitted/in_review progression.
+2. amount_in_base is computed.
+3. Expense appears in manager/admin queues based on role.
+
+## 6. Local Upload + OCR Flow
+
+Login as employee and go to Submit Expense.
+
+### 6.1 Local receipt upload
+
+1. Choose an image file.
+2. Click Upload to Server.
+
+Expected:
+
+1. Upload succeeds.
+2. Receipt URL is returned and auto-filled in Receipt URL input.
+3. Returned URL is reachable under /uploads/receipts.
+
+### 6.2 OCR extraction
+
+1. Click Extract Data.
+2. Wait for OCR progress completion.
+
+Expected:
+
+1. Amount, date, and description auto-fill from OCR text.
+2. User can edit values before submit.
+
+### 6.3 Upload validation checks
+
+1. Try unsupported file type.
+2. Try file > 5MB.
+
+Expected:
+
+1. Request is rejected with proper error.
+
+## 7. Manager and Director Approval Flow
+
+### 7.1 Manager inline action
+
+Login as manager and open Pending Approvals.
+
+1. Approve one expense using inline Approve.
+2. Reject another expense using inline Reject with comment.
+
+Expected:
+
+1. Approve moves expense forward or finishes approval depending on rule.
+2. Reject sets final rejected and closes remaining pending steps.
+
+### 7.2 Director/admin action
+
+Login as director or admin:
+
+1. Act on assigned pending approvals.
+2. Validate sequential constraints by trying out-of-order action (if applicable).
+
+Expected:
+
+1. Only valid pending step can be acted on for sequential rules.
+2. Auto-approve role or specific approver logic finalizes expense where configured.
+
+## 8. Admin Expense Oversight
+
+As admin:
 
 1. Open All Expenses.
-2. Filter rejected.
-3. Override rejected expense to approved.
+2. Filter by draft, submitted, pending, in_review, approved, rejected.
+3. Use override on pending/in_review/rejected.
 
 Expected:
-1. Status updates to approved.
-2. Change visible in expense detail.
 
-## 9. Manager Module Pages
+1. Filters return matching records.
+2. Override updates final status immediately.
 
-Login as manager.
+## 9. Team Views
 
-1. Open My Team page.
-2. Open Team Expenses page.
+As manager/director/admin:
 
-Expected:
-1. My Team shows users assigned to manager.
-2. Team Expenses shows expenses submitted by manager's team only.
-
-## 10. Multi-tenant Isolation (Critical)
-
-### 10.1 Setup Company B
-
-1. Signup new admin:
-- Name: Beta Admin
-- Company: Beta Corp
-- Country: United States
-- Email: admin.beta@mail.com
-- Password: Admin@123
-2. Create Beta employee: emp.beta@mail.com.
-3. Submit one expense in Company B.
-
-### 10.2 Isolation checks
-
-With Company A admin token/session:
-1. Users page must not show any Beta user.
-2. All Expenses must not show Beta expense.
-3. Expense detail by trying Beta expense id should return not found/forbidden.
-4. Rule delete/read should not affect Company B rules.
-
-With Company B admin:
-1. Must only see Beta data.
+1. Open My Team.
+2. Open Team Expenses.
 
 Expected:
-1. No cross-company data visibility or mutation.
 
-## 11. API Quick Smoke (Optional)
+1. Team list is scoped correctly.
+2. Team expenses are scoped to team membership.
 
-Use curl or Postman.
+## 10. Multi-Tenant Isolation (Critical)
 
-1. Auth:
-- POST /api/auth/signup
-- POST /api/auth/login
-- GET /api/auth/me
+Create Company B with separate admin and employee.
 
-2. Users:
-- GET /api/users
-- POST /api/users
-- PUT /api/users/:id
-- DELETE /api/users/:id
+With Company A credentials, verify:
 
-3. Rules:
-- GET /api/rules
-- POST /api/rules
-- DELETE /api/rules/:id
-- GET /api/rules/managers
+1. Cannot see Company B users.
+2. Cannot see Company B expenses.
+3. Cannot open Company B expense detail.
+4. Cannot mutate Company B users/rules/expenses.
 
-4. Expenses:
-- POST /api/expenses
-- GET /api/expenses/my
-- GET /api/expenses/all
-- GET /api/expenses/pending
-- GET /api/expenses/:id
-- POST /api/expenses/:id/action
-- POST /api/expenses/:id/override
+With Company B credentials, verify symmetric isolation.
 
-5. Manager:
-- GET /api/manager/team
-- GET /api/manager/expenses
+Expected:
 
-## 12. Pass Criteria
+1. Zero cross-company read/write leakage.
 
-Mark build as pass if all are true:
-1. JWT auth works (token issued, me endpoint protected).
-2. Validation works for name/email/password.
-3. Company auto-create and country currency mapping works.
-4. Role-based access works for admin/manager/director/employee.
-5. Approval engine works for sequential, percentage, specific, hybrid.
-6. Currency conversion value is stored.
-7. Manager pages show only team scoped data.
-8. Multi-tenant isolation is enforced (no cross-company leakage).
+## 11. API Smoke Checklist
 
-## 13. Known Follow-up Items (if you observe failures)
+Auth:
 
-1. Any endpoint returning data without company filter must be fixed immediately.
-2. If approval rule selection is ambiguous, map expense to explicit rule id for action processing.
-3. Add automated integration tests later (supertest + seeded DB) based on this checklist.
+1. POST /api/auth/signup
+2. POST /api/auth/login
+3. GET /api/auth/me
+4. POST /api/auth/forgot-password
+5. POST /api/auth/send-password/:userId
+
+Users:
+
+1. GET /api/users
+2. POST /api/users
+3. PUT /api/users/:id
+4. DELETE /api/users/:id
+
+Rules:
+
+1. GET /api/rules
+2. POST /api/rules
+3. DELETE /api/rules/:id
+4. GET /api/rules/managers
+
+Expenses:
+
+1. POST /api/expenses
+2. POST /api/expenses/upload-receipt
+3. GET /api/expenses/my
+4. GET /api/expenses/all
+5. GET /api/expenses/pending
+6. GET /api/expenses/:id
+7. POST /api/expenses/:id/action
+8. POST /api/expenses/:id/override
+
+Manager module:
+
+1. GET /api/manager/team
+2. GET /api/manager/expenses
+
+## 12. Final Pass Criteria
+
+Mark QA pass only if all are true:
+
+1. Auth and validation behave correctly.
+2. Role-based access is enforced for all major routes.
+3. Rule engine supports sequential and conditional approvals as configured.
+4. Draft/submitted/in_review/approved/rejected lifecycle is consistent in UI and API.
+5. Local upload + OCR autofill flow works end-to-end.
+6. Admin user management features work with proper guardrails.
+7. Tenant isolation is fully preserved.
+8. Frontend build succeeds and backend runs without migration/runtime errors.
+
+## 13. Recommended Automation Next
+
+1. Add backend integration tests for auth, expenses, and tenant isolation.
+2. Add API tests for upload endpoint constraints.
+3. Add frontend tests for Submit Expense OCR and draft/submit actions.
