@@ -1,33 +1,46 @@
 # ReimburX
 
-Production-style Reimbursement Management System with:
-- Multi-tenant company isolation
-- JWT authentication
-- Role-based workflows (admin, director, manager, employee)
-- Multi-level and conditional approval engine
-- Currency-aware expense submission
+Production-style reimbursement management platform with multi-tenant isolation, role-based approvals, draft lifecycle, and OCR-assisted receipt processing.
 
----
+## Core Features
+
+1. Multi-tenant data isolation by company.
+2. JWT-based authentication and protected APIs.
+3. Role model: admin, director, manager, employee.
+4. Approval rules with sequential, percentage, specific approver, and hybrid behavior.
+5. Draft and submitted expense lifecycle.
+6. Local receipt upload to server storage.
+7. Frontend OCR using Tesseract.js with form autofill (amount, date, description).
+8. Currency conversion to company base currency.
 
 ## Quick Start
 
 ### 1) Requirements
-- Node.js 18+
-- PostgreSQL
+
+1. Node.js 18+
+2. PostgreSQL
 
 ### 2) Configure backend env
-Create backend/.env
+
+Create backend/.env with:
 
 ```env
 DATABASE_URL=postgresql://username:password@localhost:5432/dbname
 SESSION_SECRET=replace-with-strong-secret
 JWT_SECRET=replace-with-jwt-secret
 PORT=5001
+
+# Optional email settings (used by forgot password/send password)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
 ```
 
 Notes:
-- JWT_SECRET is recommended.
-- If JWT_SECRET is missing, backend falls back to SESSION_SECRET.
+
+1. JWT_SECRET is recommended.
+2. If JWT_SECRET is missing, SESSION_SECRET is used as fallback.
 
 ### 3) Install dependencies
 
@@ -44,115 +57,121 @@ npm --prefix frontend run dev
 ```
 
 URLs:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:5001/api
 
----
+1. Frontend: http://localhost:5173
+2. Backend API: http://localhost:5001/api
+3. Uploaded files base path: http://localhost:5001/uploads
 
-## Demo Accounts (Suggested)
+## Expense + OCR + Upload Flow
 
-Use these when testing manually:
+Submit Expense page supports the following sequence:
 
-Company Alpha:
-- Admin: admin.alpha@mail.com / Admin@123
-- Director: dia.alpha@mail.com / Dir@12345
-- Manager: man.alpha@mail.com / Man@12345
-- Employee: emp1.alpha@mail.com / Emp@12345
+1. Select receipt image.
+2. Upload to local server using Upload to Server button.
+3. Extract data with OCR using Extract Data button.
+4. Form auto-fills amount, expense date, and description.
+5. User reviews/edits values.
+6. User can Submit Expense or Save as Draft.
 
-Company Beta (tenant isolation test):
-- Admin: admin.beta@mail.com / Admin@123
-- Employee: emp.beta@mail.com / Emp@12345
+Upload details:
 
----
-
-## What Is Implemented
-
-### Authentication
-- Signup creates company + first admin.
-- Login returns JWT.
-- Frontend stores token in localStorage and sends Bearer token automatically.
-- Auth guard protects APIs.
-
-### Multi-tenant model
-- Every company has isolated users, expenses, and rules.
-- Company scoping is enforced in critical expense and approval paths.
-
-### Roles
-- Admin: user management, all expenses, rules, override.
-- Director: high-level approver and team views.
-- Manager: pending approvals + team views.
-- Employee: submit and track own expenses.
-
-### Approval engine
-- Sequential approvals
-- Percentage rule
-- Specific approver rule
-- Hybrid rule
-- Manager-first option for employees
-
-### Currency system
-- Country -> currency detection on signup
-- Expense conversion to company currency during submission
-
----
+1. Endpoint: POST /api/expenses/upload-receipt
+2. Field name: receipt
+3. Allowed formats: jpg, jpeg, png, webp
+4. Max file size: 5MB
+5. Storage path: backend/uploads/receipts
 
 ## Role Capabilities
 
 | Capability | Admin | Director | Manager | Employee |
 |---|:---:|:---:|:---:|:---:|
-| Create company (signup) | ✅ | ❌ | ❌ | ❌ |
+| Create company via signup | ✅ | ❌ | ❌ | ❌ |
 | Manage users | ✅ | ❌ | ❌ | ❌ |
-| Create approval rules | ✅ | ❌ | ❌ | ❌ |
+| Create/delete rules | ✅ | ❌ | ❌ | ❌ |
 | View all company expenses | ✅ | ❌ | ❌ | ❌ |
-| View manager team | ✅ | ✅ | ✅ | ❌ |
-| View team expenses | ✅ | ✅ | ✅ | ❌ |
+| Manager/director team views | ✅ | ✅ | ✅ | ❌ |
 | Approve/reject assigned expenses | ✅ | ✅ | ✅ | ❌ |
 | Submit expenses | ✅ | ✅ | ✅ | ✅ |
-| View own expenses | ✅ | ✅ | ✅ | ✅ |
+| Save draft expenses | ✅ | ✅ | ✅ | ✅ |
 | Override final status | ✅ | ❌ | ❌ | ❌ |
 
----
-
-## Main API Map
+## API Map
 
 ### Auth
-- POST /api/auth/signup
-- POST /api/auth/login
-- GET /api/auth/me
-- GET /api/auth/logout
+
+1. POST /api/auth/signup
+2. POST /api/auth/login
+3. GET /api/auth/me
+4. GET /api/auth/logout
+5. POST /api/auth/forgot-password
+6. POST /api/auth/send-password/:userId
 
 ### Users (admin)
-- GET /api/users
-- POST /api/users
-- PUT /api/users/:id
-- DELETE /api/users/:id
+
+1. GET /api/users
+2. POST /api/users
+3. PUT /api/users/:id
+4. DELETE /api/users/:id
 
 ### Rules
-- GET /api/rules
-- POST /api/rules
-- DELETE /api/rules/:id
-- GET /api/rules/managers
+
+1. GET /api/rules
+2. POST /api/rules
+3. DELETE /api/rules/:id
+4. GET /api/rules/managers
 
 ### Expenses
-- POST /api/expenses
-- GET /api/expenses/my
-- GET /api/expenses/all
-- GET /api/expenses/pending
-- GET /api/expenses/:id
-- POST /api/expenses/:id/action
-- POST /api/expenses/:id/override
 
-### Manager/Director module
-- GET /api/manager/team
-- GET /api/manager/expenses
+1. POST /api/expenses
+2. POST /api/expenses/upload-receipt
+3. GET /api/expenses/my
+4. GET /api/expenses/all
+5. GET /api/expenses/pending
+6. GET /api/expenses/:id
+7. POST /api/expenses/:id/action
+8. POST /api/expenses/:id/override
 
----
+### Manager/Director Module
+
+1. GET /api/manager/team
+2. GET /api/manager/expenses
+
+## High-Level Data Model
+
+Main tables:
+
+1. companies
+2. users
+3. expenses
+4. approval_rules
+5. approval_steps
+6. expense_approvals
+
+Important fields:
+
+1. users.role: admin, director, manager, employee
+2. users.company_id and expenses.company_id for tenant scope
+3. expenses.status: draft, submitted, pending, in_review, approved, rejected
+4. approval rules support manager requirement, sequence toggle, min approval percentage, auto-approve role, specific approver
+
+## Manual Test Guide
+
+Use the full checklist in [test.md](test.md).
+
+It includes:
+
+1. Auth and validation checks
+2. User and rule setup
+3. Approval lifecycle and overrides
+4. Multi-tenant isolation tests
+5. API smoke checks
 
 ## Project Structure
 
 ```text
 backend/
   index.js
+  uploads/
   src/
     controllers/
     middlewares/
@@ -169,42 +188,3 @@ frontend/
     context/
     api/
 ```
-
----
-
-## Database (High-level)
-
-Tables:
-- companies
-- users
-- expenses
-- approval_rules
-- approval_steps
-- expense_approvals
-
-Important fields:
-- users.role includes admin, director, manager, employee
-- users.company_id anchors tenancy
-- expenses.company_id anchors tenancy
-- expense_approvals.step_order drives flow progression
-
----
-
-## Testing Guide
-
-Use the complete manual end-to-end checklist in:
-- test.md
-
-It includes:
-- Signup/login validation checks
-- User and rule setup
-- Full approval lifecycle
-- Tenant isolation checks
-- API smoke checklist
-
----
-
-## Notes
-
-- Chat files exist in repository but are not part of active API flow.
-- OCR extraction pipeline is not fully wired yet (receipt URL is supported).
