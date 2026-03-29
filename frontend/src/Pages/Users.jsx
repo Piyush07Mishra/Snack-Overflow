@@ -65,6 +65,16 @@ const Users = () => {
     }
   };
 
+  const handleSendPassword = async (id, email) => {
+    if (!confirm(`Send a new random password to ${email}?`)) return;
+    try {
+      await api.post(`/auth/send-password/${id}`);
+      toast.success(`Password sent to ${email}`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to send password");
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!confirm("Delete this user?")) return;
     try {
@@ -295,6 +305,12 @@ const Users = () => {
                             </button>
                           </>
                         )}
+                        <button
+                          onClick={() => handleSendPassword(u.id, u.email)}
+                          className="text-indigo-500 hover:underline text-xs"
+                        >
+                          Send Password
+                        </button>
                       </>
                     )}
                   </td>

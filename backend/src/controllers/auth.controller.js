@@ -3,6 +3,15 @@ import Company from "../models/company.model.js";
 import bcrypt from "bcrypt";
 import axios from "axios";
 import jwt from "jsonwebtoken";
+import { sendPasswordEmail } from "../services/email.service.js";
+
+const generateRandomPassword = () => {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!";
+  return Array.from(
+    { length: 10 },
+    () => chars[Math.floor(Math.random() * chars.length)],
+  ).join("");
+};
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 const FULL_NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
@@ -11,7 +20,11 @@ const clean = (value) => (typeof value === "string" ? value.trim() : "");
 
 const signToken = (user) =>
   jwt.sign(
-    { userId: user.id, role: user.role, companyId: user.company_id || user.companyId },
+    {
+      userId: user.id,
+      role: user.role,
+      companyId: user.company_id || user.companyId,
+    },
     process.env.JWT_SECRET || process.env.SESSION_SECRET,
     { expiresIn: "7d" },
   );
@@ -37,9 +50,12 @@ const getCurrencyForCountry = async (countryName) => {
 export const signUp = async (req, res) => {
   const fullName = clean(req.body.fullName);
   const email = clean(req.body.email).toLowerCase();
-  const password = typeof req.body.password === "string" ? req.body.password : "";
+  const password =
+    typeof req.body.password === "string" ? req.body.password : "";
   const confirmPassword =
-    typeof req.body.confirmPassword === "string" ? req.body.confirmPassword : "";
+    typeof req.body.confirmPassword === "string"
+      ? req.body.confirmPassword
+      : "";
   const country = clean(req.body.country);
   const companyName = clean(req.body.companyName);
 
@@ -50,7 +66,9 @@ export const signUp = async (req, res) => {
     return res.status(400).json({ message: "Enter a valid email address" });
   }
   if (fullName.length < 2) {
-    return res.status(400).json({ message: "Name must be at least 2 characters" });
+    return res
+      .status(400)
+      .json({ message: "Name must be at least 2 characters" });
   }
   if (!FULL_NAME_REGEX.test(fullName)) {
     return res
@@ -114,7 +132,8 @@ export const signUp = async (req, res) => {
 
 export const logIn = async (req, res) => {
   const email = clean(req.body.email).toLowerCase();
-  const password = typeof req.body.password === "string" ? req.body.password : "";
+  const password =
+    typeof req.body.password === "string" ? req.body.password : "";
 
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
@@ -168,7 +187,8 @@ export const logOut = (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    if (!req.user?.id) return res.status(401).json({ message: "Not authenticated" });
+    if (!req.user?.id)
+      return res.status(401).json({ message: "Not authenticated" });
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
     res.status(200).json({
@@ -186,5 +206,66 @@ export const getMe = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Forgot password — user requests reset from login page
+export const forgotPassword = async (req, res) => {
+  const email = (req.body.email || "").trim().toLowerCase();
+  if (!email) return res.status(400).json({ message: "Email is required" });
+
+  try {
+    const user = await User.findByEmail(email);
+    // Always return 200 to avoid email enumeration
+    if (!user)
+      return res
+        .status(200)
+        .json({ message: "If that email exists, a password has been sent." });
+
+    const newPassword = generateRandomPassword();
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await User.update(user.id, { password: hashed });
+
+    await sendPasswordEmail({
+      toEmail: user.email,
+      toName: user.full_name,
+      password: newPassword,
+      isReset: true,
+    });
+
+    res
+      .status(200)
+      .json({ message: "If that email exists, a password has been sent." });
+  } catch (err) {
+    console.error("Forgot password error:", err.message);
+    res.status(500).json({ message: "Error sending password reset email" });
+  }
+};
+
+// Admin sends password to a specific user
+export const sendPasswordToUser = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.company_id !== req.user.company_id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const newPassword = generateRandomPassword();
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await User.update(userId, { password: hashed });
+
+    await sendPasswordEmail({
+      toEmail: user.email,
+      toName: user.full_name,
+      password: newPassword,
+      isReset: false,
+    });
+
+    res.status(200).json({ message: `Password sent to ${user.email}` });
+  } catch (err) {
+    console.error("Send password error:", err.message);
+    res.status(500).json({ message: "Error sending password" });
   }
 };

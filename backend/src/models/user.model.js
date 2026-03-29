@@ -22,25 +22,13 @@ const User = {
     password,
     companyId,
     role = "employee",
-    mustChangePassword = false,
   }) => {
     const r = await pool.query(
-      `INSERT INTO users (full_name, email, password, company_id, role, must_change_password)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [fullName, email, password, companyId, role, mustChangePassword],
+      `INSERT INTO users (full_name, email, password, company_id, role)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [fullName, email, password, companyId, role],
     );
     return r.rows[0];
-  },
-
-  findTeamByManager: async (managerId, companyId) => {
-    const r = await pool.query(
-      `SELECT id, full_name, email, role, manager_id, is_manager_approver, created_at
-       FROM users
-       WHERE manager_id = $1 AND company_id = $2
-       ORDER BY created_at DESC`,
-      [managerId, companyId],
-    );
-    return r.rows;
   },
 
   findByCompany: async (companyId) => {
@@ -54,18 +42,30 @@ const User = {
     return r.rows;
   },
 
+  // companyId is optional — omit it for system-level updates like password reset
   update: async (id, fields, companyId) => {
     if (!fields || Object.keys(fields).length === 0) return null;
     const keys = Object.keys(fields);
     const values = Object.values(fields);
     const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
-    const r = await pool.query(
-      `UPDATE users SET ${setClause}
-       WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}
-       RETURNING *`,
-      [...values, id, companyId],
-    );
-    return r.rows[0];
+
+    if (companyId) {
+      const r = await pool.query(
+        `UPDATE users SET ${setClause}
+         WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}
+         RETURNING *`,
+        [...values, id, companyId],
+      );
+      return r.rows[0];
+    } else {
+      const r = await pool.query(
+        `UPDATE users SET ${setClause}
+         WHERE id = $${keys.length + 1}
+         RETURNING *`,
+        [...values, id],
+      );
+      return r.rows[0];
+    }
   },
 };
 
