@@ -71,7 +71,7 @@ Click **+ Add User** again:
 - Password: `priya123`
 - Role: `employee`
 - Assign Manager: `Raj Mehta`
-- Check **Is Manager Approver** ✅
+- Check **Is Manager Approver** 
 
 Click **Create User**.
 
@@ -167,7 +167,7 @@ Click **Review** → opens Expense Detail page.
 
 Raj adds a comment: `Looks good, approved for travel.`
 
-Clicks **Approve** ✅
+Clicks **Approve** 
 
 **What happens:**
 - `expense_approvals` row for Raj → status: `approved`
@@ -182,7 +182,7 @@ Switch back to Priya's tab → **My Expenses**
 
 | Category | Amount | Status |
 |---|---|---|
-| Travel | USD 5000 | ✅ approved |
+| Travel | USD 5000 |  approved |
 
 Click **View** → Approval Timeline shows:
 
@@ -255,17 +255,17 @@ Sarah logs in → **Pending Approvals** → approves it.
 
 | Flow | Demonstrated |
 |---|---|
-| Company + Admin auto-created on signup | ✅ Step 1 |
-| Country → currency auto-set (INR for India) | ✅ Step 1 |
-| Admin creates manager and employee | ✅ Step 2 |
-| Manager relationship + is_manager_approver | ✅ Step 2 |
-| Sequential approval rule creation | ✅ Step 3 |
-| Hybrid rule (percentage + specific approver) | ✅ Step 3 |
-| Employee submits multi-currency expense | ✅ Step 4 |
-| Currency conversion (USD → INR) | ✅ Step 4 |
-| Manager-first approval (step 0) | ✅ Step 5 |
-| Approve with comment | ✅ Step 5 |
-| Employee views approval status + timeline | ✅ Step 6 |
-| Reject with comment | ✅ Step 7 |
-| Admin override (force approve) | ✅ Step 8 |
-| Specific approver auto-approval (hybrid rule) | ✅ Step 9 |
+| Company + Admin auto-created on signup |  Step 1 |
+| Country → currency auto-set (INR for India) |  Step 1 |
+| Admin creates manager and employee |  Step 2 |
+| Manager relationship + is_manager_approver |  Step 2 |
+| Sequential approval rule creation |  Step 3 |
+| Hybrid rule (percentage + specific approver) |  Step 3 |
+| Employee submits multi-currency expense |  Step 4 |
+| Currency conversion (USD → INR) |  Step 4 |
+| Manager-first approval (step 0) |  Step 5 |
+| Approve with comment |  Step 5 |
+| Employee views approval status + timeline |  Step 6 |
+| Reject with comment |  Step 7 |
+| Admin override (force approve) |  Step 8 |
+| Specific approver auto-approval (hybrid rule) |  Step 9 |
