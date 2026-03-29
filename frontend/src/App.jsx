@@ -11,6 +11,8 @@ import ExpenseDetail from "./Pages/ExpenseDetail";
 import PendingApprovals from "./Pages/PendingApprovals";
 import Users from "./Pages/Users";
 import ApprovalRules from "./Pages/ApprovalRules";
+import TeamMembers from "./Pages/TeamMembers";
+import TeamExpenses from "./Pages/TeamExpenses";
 
 const App = () => {
   const { user, loading } = useAuth();
@@ -75,8 +77,24 @@ const App = () => {
       <Route
         path="/approvals"
         element={
-          <ProtectedRoute roles={["admin", "manager"]}>
+          <ProtectedRoute roles={["admin", "manager", "director"]}>
             <PendingApprovals />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager/team"
+        element={
+          <ProtectedRoute roles={["admin", "manager", "director"]}>
+            <TeamMembers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager/expenses"
+        element={
+          <ProtectedRoute roles={["admin", "manager", "director"]}>
+            <TeamExpenses />
           </ProtectedRoute>
         }
       />

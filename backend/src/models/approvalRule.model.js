@@ -47,10 +47,11 @@ const ApprovalRule = {
     return rules.rows;
   },
 
-  findById: async (id) => {
-    const r = await pool.query(`SELECT * FROM approval_rules WHERE id = $1`, [
-      id,
-    ]);
+  findById: async (id, companyId) => {
+    const r = await pool.query(
+      `SELECT * FROM approval_rules WHERE id = $1 AND company_id = $2`,
+      [id, companyId],
+    );
     if (!r.rows[0]) return null;
     const rule = r.rows[0];
     const steps = await pool.query(
@@ -62,8 +63,11 @@ const ApprovalRule = {
     return rule;
   },
 
-  deleteById: async (id) => {
-    await pool.query(`DELETE FROM approval_rules WHERE id = $1`, [id]);
+  deleteById: async (id, companyId) => {
+    await pool.query(
+      `DELETE FROM approval_rules WHERE id = $1 AND company_id = $2`,
+      [id, companyId],
+    );
   },
 };
 

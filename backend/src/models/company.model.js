@@ -3,7 +3,7 @@ import { pool } from "../lib/db.js";
 const Company = {
   create: async ({ name, country, baseCurrency }) => {
     const r = await pool.query(
-      `INSERT INTO companies (name, country, base_currency) VALUES ($1,$2,$3) RETURNING *`,
+      `INSERT INTO companies (name, country, base_currency, currency) VALUES ($1,$2,$3,$3) RETURNING *`,
       [name, country, baseCurrency],
     );
     return r.rows[0];

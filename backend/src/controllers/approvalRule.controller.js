@@ -36,7 +36,7 @@ export const createRule = async (req, res) => {
       }
     }
 
-    const full = await ApprovalRule.findById(rule.id);
+    const full = await ApprovalRule.findById(rule.id, req.user.company_id);
     res.status(201).json({ rule: full });
   } catch (err) {
     console.error(err);
@@ -46,7 +46,7 @@ export const createRule = async (req, res) => {
 
 export const deleteRule = async (req, res) => {
   try {
-    await ApprovalRule.deleteById(req.params.id);
+    await ApprovalRule.deleteById(req.params.id, req.user.company_id);
     res.json({ message: "Rule deleted" });
   } catch (err) {
     res.status(500).json({ message: "Error deleting rule" });
@@ -56,7 +56,7 @@ export const deleteRule = async (req, res) => {
 export const getManagers = async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT id, full_name, email, role FROM users WHERE company_id=$1 AND role IN ('manager','admin') ORDER BY full_name`,
+      `SELECT id, full_name, email, role FROM users WHERE company_id=$1 AND role IN ('manager','admin','director') ORDER BY full_name`,
       [req.user.company_id],
     );
     res.json({ managers: r.rows });

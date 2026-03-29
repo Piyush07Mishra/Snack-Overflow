@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
+const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+
 const SignIn = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -15,10 +17,18 @@ const SignIn = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!EMAIL_REGEX.test(form.email.trim()))
+      return toast.error("Enter a valid email address");
+
+    const payload = {
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+    };
+
     setLoading(true);
     try {
-      const res = await api.post("/auth/login", form);
-      login(res.data.user);
+      const res = await api.post("/auth/login", payload);
+      login(res.data.user, res.data.token);
       toast.success("Welcome back!");
       navigate("/dashboard");
     } catch (err) {

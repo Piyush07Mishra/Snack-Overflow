@@ -8,16 +8,31 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     api
       .get("/auth/me")
       .then((res) => setUser(res.data.user))
-      .catch(() => setUser(null))
+      .catch(() => {
+        localStorage.removeItem("auth_token");
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const login = (userData) => setUser(userData);
+  const login = (userData, token) => {
+    if (token) localStorage.setItem("auth_token", token);
+    setUser(userData);
+  };
   const logout = async () => {
-    await api.get("/auth/logout");
+    try {
+      await api.get("/auth/logout");
+    } catch (_) {}
+    localStorage.removeItem("auth_token");
     setUser(null);
   };
 

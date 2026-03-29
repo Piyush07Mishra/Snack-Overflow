@@ -31,7 +31,7 @@ const Users = () => {
   }, []);
 
   const managers = users.filter(
-    (u) => u.role === "manager" || u.role === "admin",
+    (u) => u.role === "manager" || u.role === "admin" || u.role === "director",
   );
 
   const handleCreate = async (e) => {
@@ -119,6 +119,7 @@ const Users = () => {
               >
                 <option value="employee">Employee</option>
                 <option value="manager">Manager</option>
+                <option value="director">Director</option>
               </select>
             </div>
             <div>
@@ -196,6 +197,7 @@ const Users = () => {
                       >
                         <option value="employee">employee</option>
                         <option value="manager">manager</option>
+                        <option value="director">director</option>
                       </select>
                     ) : (
                       <span

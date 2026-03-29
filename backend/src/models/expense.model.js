@@ -52,19 +52,36 @@ const Expense = {
     return r.rows;
   },
 
-  findById: async (id) => {
+  findByManagerTeam: async (managerId, companyId) => {
+    const r = await pool.query(
+      `SELECT e.*, u.full_name as submitter_name
+       FROM expenses e
+       JOIN users u ON e.submitted_by = u.id
+       WHERE u.manager_id = $1 AND e.company_id = $2
+       ORDER BY e.created_at DESC`,
+      [managerId, companyId],
+    );
+    return r.rows;
+  },
+
+  findById: async (id, companyId) => {
     const r = await pool.query(
       `SELECT e.*, u.full_name as submitter_name, u.email as submitter_email
-       FROM expenses e JOIN users u ON e.submitted_by = u.id WHERE e.id = $1`,
-      [id],
+       FROM expenses e
+       JOIN users u ON e.submitted_by = u.id
+       WHERE e.id = $1 AND e.company_id = $2`,
+      [id, companyId],
     );
     return r.rows[0] || null;
   },
 
-  updateStatus: async (id, status, currentStep) => {
+  updateStatus: async (id, status, currentStep, companyId) => {
     const r = await pool.query(
-      `UPDATE expenses SET status=$1, current_step=$2 WHERE id=$3 RETURNING *`,
-      [status, currentStep, id],
+      `UPDATE expenses
+       SET status=$1, current_step=$2
+       WHERE id=$3 AND company_id = $4
+       RETURNING *`,
+      [status, currentStep, id, companyId],
     );
     return r.rows[0];
   },

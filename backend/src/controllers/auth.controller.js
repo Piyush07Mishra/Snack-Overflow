@@ -2,6 +2,19 @@ import User from "../models/user.model.js";
 import Company from "../models/company.model.js";
 import bcrypt from "bcrypt";
 import axios from "axios";
+import jwt from "jsonwebtoken";
+
+const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+const FULL_NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+
+const clean = (value) => (typeof value === "string" ? value.trim() : "");
+
+const signToken = (user) =>
+  jwt.sign(
+    { userId: user.id, role: user.role, companyId: user.company_id || user.companyId },
+    process.env.JWT_SECRET || process.env.SESSION_SECRET,
+    { expiresIn: "7d" },
+  );
 
 // Fetch currency for a country from restcountries API
 const getCurrencyForCountry = async (countryName) => {
@@ -22,11 +35,27 @@ const getCurrencyForCountry = async (countryName) => {
 };
 
 export const signUp = async (req, res) => {
-  const { fullName, email, password, confirmPassword, country, companyName } =
-    req.body;
+  const fullName = clean(req.body.fullName);
+  const email = clean(req.body.email).toLowerCase();
+  const password = typeof req.body.password === "string" ? req.body.password : "";
+  const confirmPassword =
+    typeof req.body.confirmPassword === "string" ? req.body.confirmPassword : "";
+  const country = clean(req.body.country);
+  const companyName = clean(req.body.companyName);
 
   if (!fullName || !email || !password || !confirmPassword || !country) {
     return res.status(400).json({ message: "All fields are required" });
+  }
+  if (!EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ message: "Enter a valid email address" });
+  }
+  if (fullName.length < 2) {
+    return res.status(400).json({ message: "Name must be at least 2 characters" });
+  }
+  if (!FULL_NAME_REGEX.test(fullName)) {
+    return res
+      .status(400)
+      .json({ message: "Name can contain only letters and spaces" });
   }
   if (password !== confirmPassword) {
     return res.status(400).json({ message: "Passwords do not match" });
@@ -56,12 +85,17 @@ export const signUp = async (req, res) => {
       password: hashedPassword,
       companyId: company.id,
       role: "admin",
+      mustChangePassword: false,
     });
-
-    req.session.userId = newUser.id;
+    const token = signToken({
+      id: newUser.id,
+      role: newUser.role,
+      companyId: company.id,
+    });
 
     res.status(201).json({
       message: "Account created successfully",
+      token,
       user: {
         id: newUser.id,
         fullName: newUser.full_name,
@@ -79,9 +113,14 @@ export const signUp = async (req, res) => {
 };
 
 export const logIn = async (req, res) => {
-  const { email, password } = req.body;
+  const email = clean(req.body.email).toLowerCase();
+  const password = typeof req.body.password === "string" ? req.body.password : "";
+
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
+  }
+  if (!EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ message: "Enter a valid email address" });
   }
   try {
     const user = await User.findByEmail(email);
@@ -95,12 +134,16 @@ export const logIn = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Email or password is incorrect" });
-
-    req.session.userId = user.id;
     const fullUser = await User.findById(user.id);
+    const token = signToken({
+      id: fullUser.id,
+      role: fullUser.role,
+      company_id: fullUser.company_id,
+    });
 
     res.status(200).json({
       message: "Logged in successfully",
+      token,
       user: {
         id: fullUser.id,
         fullName: fullUser.full_name,
@@ -120,18 +163,13 @@ export const logIn = async (req, res) => {
 };
 
 export const logOut = (req, res) => {
-  req.session.destroy((err) => {
-    if (err) return res.status(500).json({ message: "Logout failed" });
-    res.clearCookie("connect.sid");
-    res.status(200).json({ message: "Logged out successfully" });
-  });
+  res.status(200).json({ message: "Logged out successfully" });
 };
 
 export const getMe = async (req, res) => {
   try {
-    if (!req.session?.userId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const user = await User.findById(req.session.userId);
+    if (!req.user?.id) return res.status(401).json({ message: "Not authenticated" });
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
     res.status(200).json({
       user: {

@@ -14,6 +14,7 @@ export const initDB = async () => {
         name VARCHAR(255) NOT NULL,
         country VARCHAR(100) NOT NULL,
         base_currency VARCHAR(10) NOT NULL,
+        currency VARCHAR(10),
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
@@ -26,9 +27,10 @@ export const initDB = async () => {
         full_name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL DEFAULT 'employee' CHECK (role IN ('admin','manager','employee')),
+        role VARCHAR(20) NOT NULL DEFAULT 'employee' CHECK (role IN ('admin','manager','employee','director')),
         manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         is_manager_approver BOOLEAN DEFAULT false,
+        must_change_password BOOLEAN DEFAULT false,
         profile_pic TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT NOW()
       );
@@ -36,10 +38,16 @@ export const initDB = async () => {
 
     // Migrate: add missing columns to users if they don't exist yet
     const migrations = [
+      `ALTER TABLE companies ADD COLUMN IF NOT EXISTS currency VARCHAR(10)`,
+      `UPDATE companies SET currency = base_currency WHERE currency IS NULL`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'employee'`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_manager_approver BOOLEAN DEFAULT false`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false`,
+      `ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`,
+      `ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','manager','employee','director'))`,
+      `ALTER TABLE expense_approvals ADD COLUMN IF NOT EXISTS approver_role VARCHAR(50)`,
     ];
     for (const sql of migrations) {
       try {
@@ -109,6 +117,7 @@ export const initDB = async () => {
         id SERIAL PRIMARY KEY,
         expense_id INTEGER REFERENCES expenses(id) ON DELETE CASCADE,
         approver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        approver_role VARCHAR(50),
         step_order INTEGER NOT NULL,
         status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
         comment TEXT,

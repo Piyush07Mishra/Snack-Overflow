@@ -4,6 +4,9 @@ import { toast } from "react-toastify";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
+const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+const FULL_NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+
 const SignUp = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -38,12 +41,29 @@ const SignUp = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.fullName.trim() || !form.country.trim())
+      return toast.error("Name and country are required");
+    if (!FULL_NAME_REGEX.test(form.fullName.trim()))
+      return toast.error("Name can contain only letters and spaces");
+    if (!EMAIL_REGEX.test(form.email.trim()))
+      return toast.error("Enter a valid email address");
+    if (form.password.length < 6)
+      return toast.error("Password must be at least 6 characters");
     if (form.password !== form.confirmPassword)
       return toast.error("Passwords do not match");
+
+    const payload = {
+      ...form,
+      fullName: form.fullName.trim(),
+      companyName: form.companyName.trim(),
+      country: form.country.trim(),
+      email: form.email.trim().toLowerCase(),
+    };
+
     setLoading(true);
     try {
-      const res = await api.post("/auth/signup", form);
-      login(res.data.user);
+      const res = await api.post("/auth/signup", payload);
+      login(res.data.user, res.data.token);
       toast.success("Account created!");
       navigate("/dashboard");
     } catch (err) {
@@ -86,6 +106,12 @@ const SignUp = () => {
                 value={form[name]}
                 onChange={handleChange}
                 required
+                pattern={name === "fullName" ? "[A-Za-z][A-Za-z .'-]*" : undefined}
+                title={
+                  name === "fullName"
+                    ? "Use letters, spaces, apostrophes, periods, or hyphens only"
+                    : undefined
+                }
                 className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm outline-none focus:border-gray-500"
               />
             </div>

@@ -11,7 +11,16 @@ const navLinks = {
   ],
   manager: [
     { to: "/dashboard", label: "Dashboard" },
+    { to: "/manager/team", label: "My Team" },
+    { to: "/manager/expenses", label: "Team Expenses" },
     { to: "/approvals", label: "Pending Approvals" },
+    { to: "/expenses/my", label: "My Expenses" },
+  ],
+  director: [
+    { to: "/dashboard", label: "Dashboard" },
+    { to: "/manager/team", label: "My Team" },
+    { to: "/manager/expenses", label: "Team Expenses" },
+    { to: "/approvals", label: "Approvals" },
     { to: "/expenses/my", label: "My Expenses" },
   ],
   employee: [

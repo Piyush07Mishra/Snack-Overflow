@@ -2,6 +2,7 @@ import Expense from "../models/expense.model.js";
 import ApprovalRule from "../models/approvalRule.model.js";
 import { pool } from "../lib/db.js";
 import axios from "axios";
+import approvalEngine from "../services/approvalEngine.service.js";
 
 const convertCurrency = async (amount, fromCurrency, toCurrency) => {
   if (fromCurrency === toCurrency) return amount;
@@ -14,27 +15,6 @@ const convertCurrency = async (amount, fromCurrency, toCurrency) => {
   } catch (_) {
     return amount;
   }
-};
-
-// Build approval queue for an expense based on rule + manager approver setting
-const buildApprovalQueue = async (expense, submitter, rule) => {
-  const approvals = [];
-
-  // If employee has a manager and is_manager_approver is true → manager goes first
-  if (submitter.is_manager_approver && submitter.manager_id) {
-    approvals.push({ approverId: submitter.manager_id, stepOrder: 0 });
-  }
-
-  if (rule) {
-    for (const step of rule.steps) {
-      approvals.push({
-        approverId: step.approver_id,
-        stepOrder: step.step_order,
-      });
-    }
-  }
-
-  return approvals;
 };
 
 export const submitExpense = async (req, res) => {
@@ -76,26 +56,31 @@ export const submitExpense = async (req, res) => {
     });
 
     // Build approval queue
-    const rule = ruleId ? await ApprovalRule.findById(ruleId) : null;
-    const approvals = await buildApprovalQueue(expense, req.user, rule);
+    const rule = ruleId
+      ? await ApprovalRule.findById(ruleId, req.user.company_id)
+      : null;
+    const approvals = approvalEngine.buildApprovalQueue({
+      submitter: req.user,
+      rule,
+    });
 
     if (approvals.length === 0) {
       // No approvers → auto approve
-      await Expense.updateStatus(expense.id, "approved", 1);
+      await Expense.updateStatus(expense.id, "approved", 1, req.user.company_id);
       return res
         .status(201)
         .json({ message: "Expense submitted and auto-approved", expense });
     }
 
     // Insert approval records
-    for (const a of approvals) {
-      await pool.query(
-        `INSERT INTO expense_approvals (expense_id, approver_id, step_order) VALUES ($1,$2,$3)`,
-        [expense.id, a.approverId, a.stepOrder],
-      );
-    }
+    await approvalEngine.seedExpenseApprovals({ expenseId: expense.id, approvals });
 
-    await Expense.updateStatus(expense.id, "in_review", approvals[0].stepOrder);
+    await Expense.updateStatus(
+      expense.id,
+      "in_review",
+      approvals[0].stepOrder,
+      req.user.company_id,
+    );
     res
       .status(201)
       .json({ message: "Expense submitted successfully", expense });
@@ -134,13 +119,16 @@ export const getPendingApprovals = async (req, res) => {
 
 export const getExpenseDetail = async (req, res) => {
   try {
-    const expense = await Expense.findById(req.params.id);
+    const expense = await Expense.findById(req.params.id, req.user.company_id);
     if (!expense) return res.status(404).json({ message: "Expense not found" });
 
     const approvals = await pool.query(
       `SELECT ea.*, u.full_name as approver_name FROM expense_approvals ea
-       JOIN users u ON ea.approver_id = u.id WHERE ea.expense_id = $1 ORDER BY ea.step_order`,
-      [req.params.id],
+       JOIN users u ON ea.approver_id = u.id
+       JOIN expenses e ON ea.expense_id = e.id
+       WHERE ea.expense_id = $1 AND e.company_id = $2
+       ORDER BY ea.step_order`,
+      [req.params.id, req.user.company_id],
     );
     res.json({ expense, approvals: approvals.rows });
   } catch (err) {
@@ -159,98 +147,15 @@ export const actOnExpense = async (req, res) => {
   }
 
   try {
-    // Find this approver's pending approval record
-    const approvalRes = await pool.query(
-      `SELECT * FROM expense_approvals WHERE expense_id=$1 AND approver_id=$2 AND status='pending'`,
-      [expenseId, req.user.id],
-    );
-    if (!approvalRes.rows[0]) {
-      return res
-        .status(403)
-        .json({ message: "No pending approval found for you on this expense" });
-    }
-
-    const approval = approvalRes.rows[0];
-    const expense = await Expense.findById(expenseId);
-    if (!expense) return res.status(404).json({ message: "Expense not found" });
-
-    // Update this approval record
-    await pool.query(
-      `UPDATE expense_approvals SET status=$1, comment=$2, acted_at=NOW() WHERE id=$3`,
-      [action, comment || null, approval.id],
-    );
-
-    if (action === "rejected") {
-      // Reject all remaining pending approvals and mark expense rejected
-      await pool.query(
-        `UPDATE expense_approvals SET status='rejected' WHERE expense_id=$1 AND status='pending'`,
-        [expenseId],
-      );
-      await Expense.updateStatus(expenseId, "rejected", approval.step_order);
-      return res.json({ message: "Expense rejected" });
-    }
-
-    // Check approval rule for this expense's company
-    const ruleRes = await pool.query(
-      `SELECT ar.* FROM approval_rules ar
-       JOIN expenses e ON e.company_id = ar.company_id
-       WHERE e.id = $1 LIMIT 1`,
-      [expenseId],
-    );
-    const rule = ruleRes.rows[0];
-
-    // Get all approvals for this expense
-    const allApprovalsRes = await pool.query(
-      `SELECT * FROM expense_approvals WHERE expense_id=$1`,
-      [expenseId],
-    );
-    const allApprovals = allApprovalsRes.rows;
-    const total = allApprovals.length;
-    const approvedCount = allApprovals.filter(
-      (a) => a.status === "approved",
-    ).length;
-    const pendingApprovals = allApprovals.filter((a) => a.status === "pending");
-
-    // Check specific approver rule
-    if (
-      rule?.rule_type === "specific_approver" ||
-      rule?.rule_type === "hybrid"
-    ) {
-      if (rule.specific_approver_id === req.user.id) {
-        await pool.query(
-          `UPDATE expense_approvals SET status='approved' WHERE expense_id=$1 AND status='pending'`,
-          [expenseId],
-        );
-        await Expense.updateStatus(expenseId, "approved", approval.step_order);
-        return res.json({
-          message: "Expense auto-approved by specific approver",
-        });
-      }
-    }
-
-    // Check percentage rule
-    if (rule?.rule_type === "percentage" || rule?.rule_type === "hybrid") {
-      const pct = (approvedCount / total) * 100;
-      if (pct >= parseFloat(rule.percentage_threshold)) {
-        await Expense.updateStatus(expenseId, "approved", approval.step_order);
-        return res.json({
-          message: "Expense approved by percentage threshold",
-        });
-      }
-    }
-
-    // Sequential: move to next step
-    if (pendingApprovals.length > 0) {
-      const nextStep = pendingApprovals.sort(
-        (a, b) => a.step_order - b.step_order,
-      )[0];
-      await Expense.updateStatus(expenseId, "in_review", nextStep.step_order);
-      return res.json({ message: "Approved, moved to next approver" });
-    }
-
-    // All approved
-    await Expense.updateStatus(expenseId, "approved", approval.step_order);
-    res.json({ message: "Expense fully approved" });
+    const result = await approvalEngine.processAction({
+      expenseId,
+      action,
+      comment,
+      approverId: req.user.id,
+      companyId: req.user.company_id,
+    });
+    if (!result.ok) return res.status(result.status).json({ message: result.message });
+    res.json({ message: result.message });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error processing approval" });
@@ -261,7 +166,13 @@ export const actOnExpense = async (req, res) => {
 export const overrideExpense = async (req, res) => {
   const { status } = req.body;
   try {
-    const expense = await Expense.updateStatus(req.params.id, status, 0);
+    const expense = await Expense.updateStatus(
+      req.params.id,
+      status,
+      0,
+      req.user.company_id,
+    );
+    if (!expense) return res.status(404).json({ message: "Expense not found" });
     res.json({ message: `Expense ${status} by admin`, expense });
   } catch (err) {
     res.status(500).json({ message: "Error overriding expense" });
